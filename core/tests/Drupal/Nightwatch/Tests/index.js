@@ -1,6 +1,7 @@
 let databasePrefix;
 
 module.exports = {
+  '@tags': ['core'],
   before: function(browser) {
     browser.installDrupal('\\Drupal\\TestSite\\TestSiteInstallTestScript', (dbPrefix) => {
       databasePrefix = dbPrefix;
