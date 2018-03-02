@@ -2,13 +2,12 @@ import path from 'path';
 import glob from 'glob';
 
 const regex = /(.+\/tests\/src\/Nightwatch\/Tests)\/.*/g;
-const folders = {};
 let m;
-glob
+const folders = glob
   .sync("**/tests/src/Nightwatch/Tests/**/*.js", {
     cwd:  path.resolve(process.cwd(), '..'),
   })
-  .forEach(file => {
+  .reduce((folders, file) => {
     while ((m = regex.exec(file)) !== null) {
       // This is necessary to avoid infinite loops with zero-width matches
       if (m.index === regex.lastIndex) {
@@ -17,7 +16,9 @@ glob
 
       folders[`../${m[1]}`] = m[1];
     }
-  });
+
+    return folders;
+  }, {});
 const testFolders = ['tests/Drupal/Nightwatch/Tests'].concat(Object.keys(folders));
 
 module.exports = {
