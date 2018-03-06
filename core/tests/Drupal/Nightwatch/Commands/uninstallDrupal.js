@@ -4,7 +4,6 @@ import { commandAsWebserver } from '../globals';
 exports.command = function uninstallDrupal(callback) {
   const self = this;
 
-  console.log(this.drupalDbPrefix);
   if (self.drupalDbPrefix) {
     const dbPrefix = self.drupalDbPrefix;
     // Nightwatch doesn't like it when no actions are added in command file.
