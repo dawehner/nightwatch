@@ -32,6 +32,7 @@ exports.command = function installDrupal(setupClass = '', callback) {
     this.pause(200);
   }
 
+  this.drupalDbPrefix = dbPrefix;
   if (typeof callback === 'function') {
     callback.call(self, dbPrefix);
   }
