@@ -110,6 +110,19 @@ sudo -u www-data -E ./vendor/bin/phpunit -c core --testsuite functional-javascri
 - Inside the `core` folder, run `yarn install`
 - Configure the nightwatch settings by copying `.env.example` to `.env` and editing as necessary.
 - Again inside the `core` folder, run `yarn test:nightwatch` to run the tests. By default this will output reports to `core/reports`
-- Nightwatch will run tests for core, as well as contrib and custom modules and themes. It will search for tests located under folders with the pattern `tests/src/Nightwatch/Tests`
+- Nightwatch will run tests for core, as well as contrib and custom modules and themes. It will search for tests located under folders with the pattern `**/tests/**/Nightwatch/(Tests|Commands|Assertions)`
 - To run only core tests, run `yarn test:nightwatch --tag core`
 - To skip running core tests, run `yarn test:nightwatch --skiptags core`
+
+Nightwatch tests can be placed in any folder with the pattern `**/tests/**/Nightwatch/(Tests|Commands|Assertions)`. For example:
+```
+tests/Nightwatch/Tests
+src/tests/Nightwatch/Tests
+tests/src/Nightwatch/Tests
+tests/Nightwatch/Commands
+```
+
+It's helpful to follow existing patterns for test placement, so for the action module they would go in `core/modules/action/tests/src/Nightwatch`.
+The Nightwatch configuration, as well as global tests, commands, and assertions which span many modules/systems, are located in `core/tests/Drupal/Nightwatch`.
+
+If your core directory is located in a subfolder (e.g. `docroot`), then you can edit the search directory in `.env` to pick up tests outside of your Drupal directory.
