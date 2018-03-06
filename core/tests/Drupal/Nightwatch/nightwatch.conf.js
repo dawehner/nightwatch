@@ -1,31 +1,49 @@
 import path from 'path';
 import glob from 'glob';
 
-const regex = /(.+\/tests\/src\/Nightwatch\/Tests)\/.*/g;
-let m;
-const folders = glob
-  .sync("**/tests/src/Nightwatch/Tests/**/*.js", {
-    cwd:  path.resolve(process.cwd(), '..'),
+// Find directories which have Nightwatch tests in them.
+const regex = /(.*\/?tests\/?.*\/Nightwatch)\/.*/g;
+const collectedFolders = {
+  Tests: [],
+  Commands: [],
+  Assertions: [],
+};
+const searchDirectory = process.env.DRUPAL_NIGHTWATCH_SEARCH_DIRECTORY  || '';
+
+glob
+  .sync('**/tests/**/Nightwatch/**/*.js', {
+    cwd: path.resolve(process.cwd(), `../${searchDirectory}`),
+    ignore: process.env.DRUPAL_NIGHTWATCH_IGNORE_DIRECTORIES ?
+      process.env.DRUPAL_NIGHTWATCH_IGNORE_DIRECTORIES.split(',') : [],
   })
-  .reduce((folders, file) => {
-    while ((m = regex.exec(file)) !== null) {
+  .forEach((file) => {
+    let m = regex.exec(file);
+    while (m !== null) {
       // This is necessary to avoid infinite loops with zero-width matches
       if (m.index === regex.lastIndex) {
-        regex.lastIndex++;
+        regex.lastIndex += 1;
       }
 
-      folders[`../${m[1]}`] = m[1];
+      const key = `../${m[1]}`;
+      Object.keys(collectedFolders).forEach(folder => {
+        if (file.includes(`Nightwatch/${folder}`)) {
+          collectedFolders[folder].push(`${searchDirectory}${key}/${folder}`);
+        }
+      });
+      m = regex.exec(file);
     }
+  });
 
-    return folders;
-  }, {});
-const testFolders = ['tests/Drupal/Nightwatch/Tests'].concat(Object.keys(folders));
+// Remove duplicate folders.
+Object.keys(collectedFolders).forEach(folder => {
+  collectedFolders[folder] = Array.from(new Set(collectedFolders[folder]));
+});
 
 module.exports = {
-  src_folders: testFolders,
+  src_folders: collectedFolders['Tests'],
   output_folder: process.env.DRUPAL_NIGHTWATCH_OUTPUT,
-  custom_commands_path: ['tests/Drupal/Nightwatch/Commands'],
-  custom_assertions_path: '',
+  custom_commands_path: collectedFolders['Commands'],
+  custom_assertions_path: collectedFolders['Assertions'],
   page_objects_path: '',
   globals_path: 'tests/Drupal/Nightwatch/globals.js',
   selenium: {
