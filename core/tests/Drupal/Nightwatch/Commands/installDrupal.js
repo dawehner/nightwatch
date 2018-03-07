@@ -4,13 +4,20 @@ import { commandAsWebserver } from '../globals';
 exports.command = function installDrupal(setupClass = '', callback) {
   const self = this;
 
+  // Allow to skip the setupClass.
+  if (typeof setupClass === 'function') {
+    callback = setupClass;
+    setupClass = '';
+  }
+
   const dbOption = process.env.DRUPAL_TEST_DB_URL.length > 0 ? `--db_url ${process.env.DRUPAL_TEST_DB_URL}` : '';
   let dbPrefix = '';
 
   try {
     // Single slash is replaced with 2 slashes because it will get printed on the command line,
     // which will be escaped again by the PHP script.
-    const install = execSync(commandAsWebserver(`php ./scripts/test-site.php install --setup_class ${setupClass.replace(/\\/g, '\\\\')} --base_url ${process.env.DRUPAL_TEST_BASE_URL} ${dbOption} --json`));
+    setupClass = setupClass ? `--setup_class ${setupClass.replace(/\\\\/g, '\\\\\\\\')}` : '';
+    const install = execSync(commandAsWebserver(`php ./scripts/test-site.php install ${setupClass} --base_url ${process.env.DRUPAL_TEST_BASE_URL} ${dbOption} --json`));
     const installData = JSON.parse(install.toString());
     dbPrefix = installData.db_prefix;
     const matches = process.env.DRUPAL_TEST_BASE_URL.match(/^https?\:\/\/([^\/?#]+)(?:[\/?#]|$)/i);
