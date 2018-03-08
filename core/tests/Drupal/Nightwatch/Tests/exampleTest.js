@@ -1,15 +1,10 @@
-let databasePrefix;
-
 module.exports = {
   '@tags': ['core'],
   before: function(browser) {
-    browser.installDrupal('\\Drupal\\TestSite\\TestSiteInstallTestScript', (dbPrefix) => {
-      databasePrefix = dbPrefix;
-    })
+    browser.installDrupal('\\Drupal\\TestSite\\TestSiteInstallTestScript');
   },
   after: function(browser, done) {
-    browser.uninstallDrupal(databasePrefix);
-    done();
+    browser.uninstallDrupal(done);
   },
   'Test page': (browser) => {
     browser
