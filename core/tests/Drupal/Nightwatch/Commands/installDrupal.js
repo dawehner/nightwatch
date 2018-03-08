@@ -1,6 +1,16 @@
 import { execSync } from 'child_process';
 import { commandAsWebserver } from '../globals';
 
+/**
+ * Installs a Drupal test site.
+ *
+ * @param {string} setupClass
+ *   (optional) The setup class.
+ * @param {function} callback
+ *   A callback which will be called, when the installation is finished.
+ * @return {object}
+ *   The 'browser' object.
+ */
 exports.command = function installDrupal(setupClass = '', callback) {
   const self = this;
 
@@ -27,11 +37,11 @@ exports.command = function installDrupal(setupClass = '', callback) {
       .url(process.env.DRUPAL_TEST_BASE_URL)
       .setCookie({
         name: 'SIMPLETEST_USER_AGENT',
-        // Colons needs to be URL encoded to be valid.
+        // Colons need to be URL encoded to be valid.
         value: encodeURIComponent(installData.user_agent),
-        path: path,
-        domain: domain,
-      })
+        path,
+        domain,
+      });
   }
   catch(error) {
     this.assert.fail(error);
