@@ -4,8 +4,10 @@
  *
  * This provides a custom command, .relativeURL()
  *
- * @param  {string} pathname
+ * @param {string} pathname
  *   The relative path to append to DRUPAL_TEST_BASE_URL
+ * @param {function} callback
+ *   A callback which will be called.
  * @return {object}
  *   The 'browser' object.
  */

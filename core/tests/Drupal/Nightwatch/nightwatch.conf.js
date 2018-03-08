@@ -19,7 +19,7 @@ glob
   .forEach((file) => {
     let m = regex.exec(file);
     while (m !== null) {
-      // This is necessary to avoid infinite loops with zero-width matches
+      // This is necessary to avoid infinite loops with zero-width matches.
       if (m.index === regex.lastIndex) {
         regex.lastIndex += 1;
       }
