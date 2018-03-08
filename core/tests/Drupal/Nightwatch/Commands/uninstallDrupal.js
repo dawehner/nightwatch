@@ -1,6 +1,16 @@
 import { execSync } from 'child_process';
 import { commandAsWebserver } from '../globals';
 
+/**
+ * Uninstalls a test Drupal site.
+ *
+ * @param {string} dbPrefix
+ *   (optional_ The database prefix, which should be teared down.
+ * @param {function} callback
+ *   A callback which will be called, when the uninstallation is finished.
+ * @return {object}
+ *   The 'browser' object.
+ */
 exports.command = function uninstallDrupal(dbPrefix, callback) {
   const self = this;
 
