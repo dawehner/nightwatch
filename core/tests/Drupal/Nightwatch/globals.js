@@ -19,7 +19,7 @@ module.exports = {
     if (!process.env.DRUPAL_TEST_BASE_URL) {
       // @todo Use https://www.drupal.org/project/ideas/issues/2911319 once its available.
       process.env.DRUPAL_TEST_BASE_URL = 'http://localhost:8888';
-      phpWebServer = spawn(commandAsWebserver('php'), ['-S', 'localhost:8888', '.ht.router.php'], {cwd: '../'});
+      phpWebServer = spawn(commandAsWebserver('php'), ['-S', 'localhost:8888', '.ht.router.php'], { cwd: '../' });
     }
     done();
   },
