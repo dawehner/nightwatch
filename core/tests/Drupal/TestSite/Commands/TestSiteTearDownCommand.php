@@ -20,28 +20,6 @@ use Symfony\Component\Console\Style\SymfonyStyle;
 class TestSiteTearDownCommand extends Command {
 
   /**
-   * The used PHP autoloader.
-   *
-   * @var object
-   */
-  protected $autoloader;
-
-  /**
-   * Constructs a new TestSiteTearDownCommand.
-   *
-   * @param string $autoloader
-   *   The used PHP autoloader.
-   * @param string|null $name
-   *   The name of the command. Passing NULL means it must be set in
-   *   configure().
-   */
-  public function __construct($autoloader, $name = NULL) {
-    parent::__construct($name);
-
-    $this->autoloader = $autoloader;
-  }
-
-  /**
    * {@inheritdoc}
    */
   protected function configure() {
@@ -50,8 +28,10 @@ class TestSiteTearDownCommand extends Command {
       ->setHelp('All the database tables and files will be removed.')
       ->addArgument('db_prefix', InputArgument::REQUIRED, 'The database prefix for the test site')
       ->addOption('db_url', NULL, InputOption::VALUE_OPTIONAL, 'URL for database or SIMPLETEST_DB', getenv('SIMPLETEST_DB'))
+      ->addOption('keep_lock', NULL, InputOption::VALUE_NONE, 'Keeps the database prefix lock. Useful for ensuring test isolation when running concurrent tests.')
       ->addUsage('test12345678')
-      ->addUsage('test12345678 --db_url "mysql://username:password@localhost/databasename#table_prefix"');
+      ->addUsage('test12345678 --db_url "mysql://username:password@localhost/databasename#table_prefix"')
+      ->addUsage('test12345678 --keep_lock');
   }
 
   /**
@@ -76,6 +56,12 @@ class TestSiteTearDownCommand extends Command {
 
     // Handle the cleanup of the test site.
     $this->tearDown($test_database, $db_url);
+
+    // Release the test database prefix lock.
+    if (!$input->getOption('keep_lock')) {
+      $test_database->releaseLock();
+    }
+
     $output->writeln("<info>Successfully uninstalled $db_prefix test site</info>");
   }
 
@@ -102,16 +88,16 @@ class TestSiteTearDownCommand extends Command {
     array_walk($tables, [$schema, 'dropTable']);
 
     // Delete test site directory.
-    $this->fileUnmanagedDeleteRecursive($root . '/' . $test_database->getTestSitePath(), [BrowserTestBase::class, 'filePreDeleteCallback']);
+    $this->fileUnmanagedDeleteRecursive($root . DIRECTORY_SEPARATOR . $test_database->getTestSitePath(), [BrowserTestBase::class, 'filePreDeleteCallback']);
   }
 
   /**
-   * Deletes all files and directories in the specified filepath recursively.
+   * Deletes all files and directories in the specified path recursively.
    *
-   * Note this version has no dependencies on Drupal core to ensure that the
+   * Note this method has no dependencies on Drupal core to ensure that the
    * test site can be torn down even if something in the test site is broken.
    *
-   * @param $path
+   * @param string $path
    *   A string containing either an URI or a file or directory path.
    * @param callable $callback
    *   (optional) Callback function to run on each file prior to deleting it and

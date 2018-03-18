@@ -3,9 +3,9 @@
 namespace Drupal\TestSite;
 
 /**
- * Allows you to setup an environment as part of a test site install.
+ * Allows setting up an environment as part of a test site install.
  *
- * @see \Drupal\TestSite\TestSiteApplication
+ * @see \Drupal\TestSite\Commands\TestSiteInstallCommand
  */
 interface TestSetupInterface {
 

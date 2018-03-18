@@ -4,6 +4,7 @@ namespace Drupal\TestSite\Commands;
 
 use Drupal\Core\Database\Database;
 use Drupal\Core\Test\FunctionalTestSetupTrait;
+use Drupal\Core\Test\TestDatabase;
 use Drupal\Core\Test\TestSetupTrait;
 use Drupal\TestSite\TestSetupInterface;
 use Drupal\Tests\RandomGeneratorTrait;
@@ -40,6 +41,8 @@ class TestSiteInstallCommand extends Command {
   /**
    * Time limit in seconds for the test.
    *
+   * Used by \Drupal\Core\Test\FunctionalTestSetupTrait::prepareEnvironment().
+   *
    * @var int
    */
   protected $timeLimit = 500;
@@ -65,13 +68,13 @@ class TestSiteInstallCommand extends Command {
     $this->setName('install')
       ->setDescription('Creates a test Drupal site')
       ->setHelp('The details to connect to the test site created will be displayed upon success. It will contain the database prefix and the user agent.')
-      ->addOption('setup_class', NULL, InputOption::VALUE_OPTIONAL, 'A PHP class to setup configuration used by the test, for example, \Drupal\TestSite\TestSiteInstallTestScript')
+      ->addOption('setup_file', NULL, InputOption::VALUE_OPTIONAL, 'The path to a PHP file containing a class to setup configuration used by the test, for example, core/tests/Drupal/TestSite/TestSiteInstallTestScript.php')
       ->addOption('db_url', NULL, InputOption::VALUE_OPTIONAL, 'URL for database or SIMPLETEST_DB', getenv('SIMPLETEST_DB'))
       ->addOption('base_url', NULL, InputOption::VALUE_OPTIONAL, 'Base URL for site under test or SIMPLETEST_BASE_URL', getenv('SIMPLETEST_BASE_URL'))
       ->addOption('install_profile', NULL, InputOption::VALUE_OPTIONAL, 'Install profile to install the site in. Defaults to testing', 'testing')
       ->addOption('langcode', NULL, InputOption::VALUE_OPTIONAL, 'The language to install the site in. Defaults to en', 'en')
       ->addOption('json', NULL, InputOption::VALUE_NONE, 'Output test site connection details in JSON')
-      ->addUsage('--setup_class "\Drupal\TestSite\TestSiteInstallTestScript" --json')
+      ->addUsage('--setup_file core/tests/Drupal/TestSite/TestSiteInstallTestScript.php --json')
       ->addUsage('--install_profile demo_umami --langcode fr')
       ->addUsage('--base_url "http://example.com" --db_url "mysql://username:password@localhost/databasename#table_prefix"');
   }
@@ -80,9 +83,9 @@ class TestSiteInstallCommand extends Command {
    * {@inheritdoc}
    */
   protected function execute(InputInterface $input, OutputInterface $output) {
-    // Validate the setup class prior to installing a database to avoid creating
-    // unnecessary sites.
-    $this->validateSetupClass($input->getOption('setup_class'));
+    // Determines and validates the setup class prior to installing a database
+    // to avoid creating unnecessary sites.
+    $class_name = $this->getSetupClass($input->getOption('setup_file'));
     // Ensure we can install a site in the sites/simpletest directory.
     $this->ensureDirectory();
 
@@ -92,7 +95,7 @@ class TestSiteInstallCommand extends Command {
     putenv("SIMPLETEST_BASE_URL=$base_url");
 
     // Manage site fixture.
-    $this->setup($input->getOption('install_profile'), $input->getOption('setup_class'), $input->getOption('langcode'));
+    $this->setup($input->getOption('install_profile'), $class_name, $input->getOption('langcode'));
 
     $user_agent = drupal_generate_test_ua($this->databasePrefix);
     if ($input->getOption('json')) {
@@ -112,26 +115,38 @@ class TestSiteInstallCommand extends Command {
   }
 
   /**
-   * Validates the setup class.
+   * Gets the setup class.
    *
-   * @param string|null $class
-   *   The setup class to validate.
+   * @param string|null $file
+   *   The file to get the setup class from.
+   *
+   * @return string|null
+   *   The setup class contained in the provided $file.
    *
    * @throws \InvalidArgumentException
-   *   Thrown if the class does not exist or does not implement
-   *   \Drupal\TestSite\TestSetupInterface.
+   *   Thrown if the file does not exist, does not contain a class or the class
+   *   does not implement \Drupal\TestSite\TestSetupInterface.
    */
-  protected function validateSetupClass($class) {
-    if ($class === NULL) {
+  protected function getSetupClass($file) {
+    if ($file === NULL) {
       return;
     }
-    if (!class_exists($class)) {
-      throw new \InvalidArgumentException("There was a problem loading $class");
+    if (!file_exists($file)) {
+      throw new \InvalidArgumentException("The file $file does not exist.");
     }
 
-    if (!is_subclass_of($class, TestSetupInterface::class)) {
-      throw new \InvalidArgumentException('You need to define a class implementing \Drupal\TestSite\TestSetupInterface');
+    $classes = get_declared_classes();
+    include_once $file;
+    $new_classes = array_values(array_diff(get_declared_classes(), $classes));
+    if (empty($new_classes)) {
+      throw new \InvalidArgumentException("The file $file does not contain a class.");
     }
+    $class = array_pop($new_classes);
+
+    if (!is_subclass_of($class, TestSetupInterface::class)) {
+      throw new \InvalidArgumentException("The class $class contained in $file needs to implement \Drupal\TestSite\TestSetupInterface");
+    }
+    return $class;
   }
 
   /**
@@ -187,7 +202,7 @@ class TestSiteInstallCommand extends Command {
    * Uses the setup file to configure Drupal.
    *
    * @param string $class
-   *   The full qualified class name, which should setup Drupal for tests. For
+   *   The fully qualified class name, which should set up Drupal for tests. For
    *   example this class could create content types and fields or install
    *   modules. The class needs to implement TestSetupInterface.
    *
@@ -215,6 +230,16 @@ class TestSiteInstallCommand extends Command {
     // Ensure that we use the database from SIMPLETEST_DB environment variable.
     Database::removeConnection('default');
     $this->changeDatabasePrefixTrait();
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function prepareDatabasePrefix() {
+    // Override this method so that we can force a lock to be created.
+    $test_db = new TestDatabase(NULL, TRUE);
+    $this->siteDirectory = $test_db->getTestSitePath();
+    $this->databasePrefix = $test_db->getDatabasePrefix();
   }
 
 }
