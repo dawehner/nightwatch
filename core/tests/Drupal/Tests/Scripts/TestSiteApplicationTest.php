@@ -2,9 +2,9 @@
 
 namespace Drupal\Tests\Scripts;
 
+use Drupal\Component\FileSystem\FileSystem;
 use Drupal\Core\Database\Database;
 use Drupal\Core\Test\TestDatabase;
-use Drupal\TestSite\TestSiteInstallTestScript;
 use Drupal\Tests\UnitTestCase;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\Request;
@@ -17,7 +17,7 @@ use Symfony\Component\Process\Process;
  * @group Setup
  *
  * This test uses the Drupal\Core\Database\Database class which has a static.
- * Therefore run in an separate process to avoid side effects.
+ * Therefore run in a separate process to avoid side effects.
  *
  * @runTestsInSeparateProcesses
  * @preserveGlobalState disabled
@@ -39,7 +39,7 @@ class TestSiteApplicationTest extends UnitTestCase {
   /**
    * @coversNothing
    */
-  public function testInstallWithNonExistingClass() {
+  public function testInstallWithNonExistingFile() {
     $php_binary_finder = new PhpExecutableFinder();
     $php_binary_path = $php_binary_finder->find();
 
@@ -47,11 +47,31 @@ class TestSiteApplicationTest extends UnitTestCase {
     $connection = Database::getConnection('default', $this->addTestDatabase(''));
     $table_count = count($connection->schema()->findTables('%'));
 
-    $command_line = $php_binary_path . ' core/scripts/test-site.php install --setup_class "this-class-does-not-exist" --db_url "' . getenv('SIMPLETEST_DB') . '"';
+    $command_line = $php_binary_path . ' core/scripts/test-site.php install --setup_file "this-class-does-not-exist" --db_url "' . getenv('SIMPLETEST_DB') . '"';
     $process = new Process($command_line, $this->root);
     $process->run();
 
-    $this->assertContains('There was a problem loading this-class-does-not-exist', $process->getErrorOutput());
+    $this->assertContains('The file this-class-does-not-exist does not exist.', $process->getErrorOutput());
+    $this->assertSame(1, $process->getExitCode());
+    $this->assertCount($table_count, $connection->schema()->findTables('%'), 'No additional tables created in the database');
+  }
+
+  /**
+   * @coversNothing
+   */
+  public function testInstallWithFileWithNoClass() {
+    $php_binary_finder = new PhpExecutableFinder();
+    $php_binary_path = $php_binary_finder->find();
+
+    // Create a connection to the DB configured in SIMPLETEST_DB.
+    $connection = Database::getConnection('default', $this->addTestDatabase(''));
+    $table_count = count($connection->schema()->findTables('%'));
+
+    $command_line = $php_binary_path . ' core/scripts/test-site.php install --setup_file core/tests/fixtures/empty_file.php.module --db_url "' . getenv('SIMPLETEST_DB') . '"';
+    $process = new Process($command_line, $this->root);
+    $process->run();
+
+    $this->assertContains('The file core/tests/fixtures/empty_file.php.module does not contain a class', $process->getErrorOutput());
     $this->assertSame(1, $process->getExitCode());
     $this->assertCount($table_count, $connection->schema()->findTables('%'), 'No additional tables created in the database');
   }
@@ -67,11 +87,13 @@ class TestSiteApplicationTest extends UnitTestCase {
     $connection = Database::getConnection('default', $this->addTestDatabase(''));
     $table_count = count($connection->schema()->findTables('%'));
 
-    $command_line = $php_binary_path . ' core/scripts/test-site.php install --setup_class "' . static::class . '" --db_url "' . getenv('SIMPLETEST_DB') . '"';
+    // Use __FILE__ to test absolute paths.
+    $command_line = $php_binary_path . ' core/scripts/test-site.php install --setup_file "' . __FILE__ . '" --db_url "' . getenv('SIMPLETEST_DB') . '"';
     $process = new Process($command_line, $this->root);
     $process->run();
 
-    $this->assertContains('You need to define a class implementing \Drupal\TestSite\TestSetupInterface', $process->getErrorOutput());
+    $this->assertContains('The class Drupal\Tests\Scripts\TestSiteApplicationTest contained in', $process->getErrorOutput());
+    $this->assertContains('needs to implement \Drupal\TestSite\TestSetupInterface', $process->getErrorOutput());
     $this->assertSame(1, $process->getExitCode());
     $this->assertCount($table_count, $connection->schema()->findTables('%'), 'No additional tables created in the database');
   }
@@ -85,10 +107,10 @@ class TestSiteApplicationTest extends UnitTestCase {
       $this->markTestSkipped("Requires the directory $simpletest_path to exist and be writable");
     }
     $php_binary_finder = new PhpExecutableFinder();
-    $php_inary_path = $php_binary_finder->find();
+    $php_binary_path = $php_binary_finder->find();
 
     // Install a site using the JSON output.
-    $command_line = $php_inary_path . ' core/scripts/test-site.php install --json --setup_class "' . TestSiteInstallTestScript::class . '" --db_url "' . getenv('SIMPLETEST_DB') . '"';
+    $command_line = $php_binary_path . ' core/scripts/test-site.php install --json --setup_file core/tests/Drupal/TestSite/TestSiteInstallTestScript.php --db_url "' . getenv('SIMPLETEST_DB') . '"';
     $process = new Process($command_line, $this->root);
     // Set the timeout to a value that allows debugging.
     $process->setTimeout(500);
@@ -107,17 +129,20 @@ class TestSiteApplicationTest extends UnitTestCase {
     // Ensure the test_page_test module got installed.
     $this->assertContains('Test page | Drupal', (string) $response->getBody());
 
-    // Ensure that there are files and database tables for tear down command to
-    // clean up.
+    // Ensure that there are files and database tables for the tear down command
+    // to clean up.
     $key = $this->addTestDatabase($db_prefix);
     $this->assertGreaterThan(0, count(Database::getConnection('default', $key)->schema()->findTables('%')));
     $test_database = new TestDatabase($db_prefix);
     $test_file = $this->root . DIRECTORY_SEPARATOR . $test_database->getTestSitePath() . DIRECTORY_SEPARATOR . '.htkey';
     $this->assertFileExists($test_file);
 
-    // Install another site so we can ensure tear down only removes one site at
-    // a time. Use the regular output.
-    $command_line = $php_inary_path . ' core/scripts/test-site.php install --setup_class "' . TestSiteInstallTestScript::class . '" --db_url "' . getenv('SIMPLETEST_DB') . '"';
+    // Ensure the lock file exists.
+    $this->assertFileExists($this->getTestLockFile($db_prefix));
+
+    // Install another site so we can ensure the tear down command only removes
+    // one site at a time. Use the regular output.
+    $command_line = $php_binary_path . ' core/scripts/test-site.php install --setup_file core/tests/Drupal/TestSite/TestSiteInstallTestScript.php --db_url "' . getenv('SIMPLETEST_DB') . '"';
     $process = new Process($command_line, $this->root);
     // Set the timeout to a value that allows debugging.
     $process->setTimeout(500);
@@ -131,8 +156,11 @@ class TestSiteApplicationTest extends UnitTestCase {
     $other_key = $this->addTestDatabase($other_db_prefix);
     $this->assertGreaterThan(0, count(Database::getConnection('default', $other_key)->schema()->findTables('%')));
 
-    // Now test the tear down process as well.
-    $command_line = $php_inary_path . ' core/scripts/test-site.php tear-down ' . $db_prefix . ' --db_url "' . getenv('SIMPLETEST_DB') . '"';
+    // Ensure the lock file exists for the new install.
+    $this->assertFileExists($this->getTestLockFile($other_db_prefix));
+
+    // Now test the tear down process as well, but keep the lock.
+    $command_line = $php_binary_path . ' core/scripts/test-site.php tear-down ' . $db_prefix . ' --keep_lock --db_url "' . getenv('SIMPLETEST_DB') . '"';
     $process = new Process($command_line, $this->root);
     // Set the timeout to a value that allows debugging.
     $process->setTimeout(500);
@@ -150,11 +178,11 @@ class TestSiteApplicationTest extends UnitTestCase {
     $test_file = $this->root . DIRECTORY_SEPARATOR . $test_database->getTestSitePath() . DIRECTORY_SEPARATOR . '.htkey';
     $this->assertFileExists($test_file);
 
-    // Tear down the other site installed. Tear down should work if the test
-    // site is broken. Prove this by removing its settings.php.
+    // Tear down the other site. Tear down should work if the test site is
+    // broken. Prove this by removing its settings.php.
     $test_site_settings = $this->root . DIRECTORY_SEPARATOR . $test_database->getTestSitePath() . DIRECTORY_SEPARATOR . 'settings.php';
     $this->assertTrue(unlink($test_site_settings));
-    $command_line = $php_inary_path . ' core/scripts/test-site.php tear-down ' . $other_db_prefix . ' --db_url "' . getenv('SIMPLETEST_DB') . '"';
+    $command_line = $php_binary_path . ' core/scripts/test-site.php tear-down ' . $other_db_prefix . ' --db_url "' . getenv('SIMPLETEST_DB') . '"';
     $process = new Process($command_line, $this->root);
     // Set the timeout to a value that allows debugging.
     $process->setTimeout(500);
@@ -165,6 +193,11 @@ class TestSiteApplicationTest extends UnitTestCase {
     // Ensure that all the tables and files for this DB prefix are gone.
     $this->assertCount(0, Database::getConnection('default', $other_key)->schema()->findTables('%'));
     $this->assertFileNotExists($test_file);
+
+    // The lock for the first site should still exist but the second site's lock
+    // is released during tear down.
+    $this->assertFileExists($this->getTestLockFile($db_prefix));
+    $this->assertFileNotExists($this->getTestLockFile($other_db_prefix));
   }
 
   /**
@@ -178,7 +211,7 @@ class TestSiteApplicationTest extends UnitTestCase {
     $php_binary_finder = new PhpExecutableFinder();
     $php_binary_path = $php_binary_finder->find();
 
-    $command_line = $php_binary_path . ' core/scripts/test-site.php install --json --langcode fr --setup_class "' . TestSiteInstallTestScript::class . '" --db_url "' . getenv('SIMPLETEST_DB') . '"';
+    $command_line = $php_binary_path . ' core/scripts/test-site.php install --json --langcode fr --setup_file core/tests/Drupal/TestSite/TestSiteInstallTestScript.php --db_url "' . getenv('SIMPLETEST_DB') . '"';
     $process = new Process($command_line, $this->root);
     $process->setTimeout(500);
     $process->run();
@@ -236,6 +269,20 @@ class TestSiteApplicationTest extends UnitTestCase {
     $target = __CLASS__ . $db_prefix;
     Database::addConnectionInfo($target, 'default', $database);
     return $target;
+  }
+
+  /**
+   * Gets the lock file path.
+   *
+   * @param string $db_prefix
+   *   The prefix of the installed test site.
+   *
+   * @return string
+   *   The lock file path.
+   */
+  protected function getTestLockFile($db_prefix) {
+    $lock_id = str_replace('test', '', $db_prefix);
+    return FileSystem::getOsTemporaryDirectory() . '/test_' . $lock_id;
   }
 
 }

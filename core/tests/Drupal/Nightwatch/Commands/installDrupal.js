@@ -4,20 +4,20 @@ import { commandAsWebserver } from '../globals';
 /**
  * Installs a Drupal test site.
  *
- * @param {string} setupClass
- *   (optional) The setup class.
+ * @param {string} setupFile
+ *   (optional) The setup file.
  * @param {function} callback
  *   A callback which will be called, when the installation is finished.
  * @return {object}
  *   The 'browser' object.
  */
-exports.command = function installDrupal(setupClass = '', callback) {
+exports.command = function installDrupal(setupFile = '', callback) {
   const self = this;
 
   // Allow to skip the setupClass.
-  if (typeof setupClass === 'function') {
-    callback = setupClass;
-    setupClass = '';
+  if (typeof setupFile === 'function') {
+    callback = setupFile;
+    setupFile = '';
   }
 
   const dbOption = process.env.DRUPAL_TEST_DB_URL.length > 0 ? `--db_url ${process.env.DRUPAL_TEST_DB_URL}` : '';
@@ -26,8 +26,8 @@ exports.command = function installDrupal(setupClass = '', callback) {
   try {
     // Single slash is replaced with 2 slashes because it will get printed on the command line,
     // which will be escaped again by the PHP script.
-    setupClass = setupClass ? `--setup_class ${setupClass.replace(/\\\\/g, '\\\\\\\\')}` : '';
-    const install = execSync(commandAsWebserver(`php ./scripts/test-site.php install ${setupClass} --base_url ${process.env.DRUPAL_TEST_BASE_URL} ${dbOption} --json`));
+    setupFile = setupFile ? `--setup_file "${setupFile}"` : '';
+    const install = execSync(commandAsWebserver(`php ./scripts/test-site.php install ${setupFile} --base_url ${process.env.DRUPAL_TEST_BASE_URL} ${dbOption} --json`));
     const installData = JSON.parse(install.toString());
     dbPrefix = installData.db_prefix;
     const matches = process.env.DRUPAL_TEST_BASE_URL.match(/^https?\:\/\/([^\/?#]+)(?:[\/?#]|$)/i);
