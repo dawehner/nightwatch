@@ -1,7 +1,7 @@
 module.exports = {
   '@tags': ['core'],
   before: function(browser) {
-    browser.installDrupal('\\Drupal\\TestSite\\TestSiteInstallTestScript');
+    browser.installDrupal('core/tests/Drupal/TestSite/TestSiteInstallTestScript.php');
   },
   after: function(browser, done) {
     browser.uninstallDrupal(done);
