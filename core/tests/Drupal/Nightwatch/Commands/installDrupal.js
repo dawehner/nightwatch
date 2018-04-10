@@ -14,7 +14,7 @@ import { commandAsWebserver } from '../globals';
 exports.command = function installDrupal(setupFile = '', callback) {
   const self = this;
 
-  // Allow to skip the setupClass.
+  // Allow the setupFile argument to be omitted.
   if (typeof setupFile === 'function') {
     callback = setupFile;
     setupFile = '';
@@ -24,8 +24,6 @@ exports.command = function installDrupal(setupFile = '', callback) {
   let dbPrefix = '';
 
   try {
-    // Single slash is replaced with 2 slashes because it will get printed on the command line,
-    // which will be escaped again by the PHP script.
     setupFile = setupFile ? `--setup-file "${setupFile}"` : '';
     const install = execSync(commandAsWebserver(`php ./scripts/test-site.php install ${setupFile} --base-url ${process.env.DRUPAL_TEST_BASE_URL} ${dbOption} --json`));
     const installData = JSON.parse(install.toString());

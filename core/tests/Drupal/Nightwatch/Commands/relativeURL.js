@@ -1,4 +1,3 @@
-
 /**
  * Concatenate a DRUPAL_TEST_BASE_URL variable and a pathname.
  *

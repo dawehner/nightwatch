@@ -20,7 +20,6 @@ exports.command = function uninstallDrupal(dbPrefix, callback) {
   }
   dbPrefix = dbPrefix || self.drupalDbPrefix;
 
-  // Nightwatch doesn't like it when no actions are added in command file.
   const dbOption = process.env.DRUPAL_TEST_DB_URL.length > 0 ? `--db-url ${process.env.DRUPAL_TEST_DB_URL}` : '';
   try {
     execSync(commandAsWebserver(`php ./scripts/test-site.php tear-down ${dbPrefix} ${dbOption}`));
